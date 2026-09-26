@@ -14,4 +14,4 @@ GoPet como referencia funcional.
 
 ## Curso
 jhon huamani
-Arquitectura de Software
+Arquitectura de Softwaregggg

@@ -13,5 +13,5 @@ Marketplace académico de productos para mascotas.
 GoPet como referencia funcional.
 
 ## Curso
-jhon
+jhon huamani
 Arquitectura de Software

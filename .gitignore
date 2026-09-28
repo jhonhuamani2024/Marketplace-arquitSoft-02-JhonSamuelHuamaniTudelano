@@ -1,0 +1,13 @@
+# Visual Studio Code
+
+.vscode/
+
+# Sistema operativo
+
+.DS_Store
+Thumbs.db
+
+# Archivos temporales
+
+*.tmp
+*.temp

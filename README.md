@@ -1,5 +1,9 @@
 # Marketplace de productos para mascotas
 
+## Nombre
+
+Jhon Samuel Huamani Tudelano
+
 ## Descripción
 
 Marketplace académico de productos para mascotas.
@@ -10,6 +14,4 @@ GoPet como referencia funcional.
 
 ## Curso
 
-jhon huamani
-Arquitectura de Soft
-
+Arquitectura de Software

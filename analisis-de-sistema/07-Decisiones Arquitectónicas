@@ -1,0 +1,151 @@
+# 5. Decisiones arquitectónicas (ADR)
+
+Un ADR (Architecture Decision Record) documenta una decisión importante de
+arquitectura junto con su contexto, alternativas y consecuencias. Cada decisión
+responde a uno o más drivers arquitectónicos.
+
+## 5.1 Resumen de decisiones
+
+| ID | Decisión | Driver relacionado | Justificación | Resultado |
+|---|---|---|---|---|
+| ADR-001 | Monolito modular | DA01 Escalabilidad, DA06 Mantenibilidad | Organizar las funcionalidades en módulos independientes dentro de una misma aplicación desplegable | Módulos de Usuarios, Sellers, Catálogo, Carrito, Pedidos y Pagos |
+| ADR-002 | Clean Architecture | DA06 Mantenibilidad | Separar las reglas del negocio de los detalles tecnológicos | Capas de Dominio, Aplicación, Infraestructura y Presentación |
+| ADR-003 | Estrategia de caché | DA02 Rendimiento | Reducir consultas repetitivas a la fuente de datos | Caché para información de consulta frecuente |
+| ADR-004 | Integración de pagos mediante interfaces y adaptadores | DA04 Pago externo | Desacoplar los casos de uso del proveedor de pagos | Contrato de pagos y adaptador para la pasarela externa |
+| ADR-005 | API REST entre frontend y backend | DA05 API REST | Desacoplar la interfaz del backend | Endpoints versionados `/api/v1/*` en JSON |
+| ADR-006 | Autenticación con JWT y roles | DA03 Seguridad | Proteger datos y diferenciar cliente, seller y administrador | Middleware de autenticación y autorización |
+
+---
+
+## 5.2 Detalle de cada decisión
+
+### ADR-001: Monolito modular
+
+- **Estado:** Aceptada
+- **Drivers:** DA01 Escalabilidad, DA06 Mantenibilidad
+- **Contexto:** El marketplace debe crecer en funcionalidades y soportar picos de
+  usuarios en campañas. El equipo es pequeño y no cuenta con experiencia ni
+  recursos para operar muchos servicios.
+- **Decisión:** Construir una sola aplicación desplegable, dividida en módulos con
+  límites claros (Usuarios, Sellers, Catálogo, Carrito, Pedidos, Pagos). Un módulo
+  no accede a las tablas de otro; se comunica con él a través de su service.
+- **Alternativas evaluadas:**
+  - *Microservicios:* escalan por separado, pero exigen más infraestructura,
+    monitoreo y comunicación entre servicios. Es demasiada complejidad para esta etapa.
+  - *Monolito sin módulos:* es el más simple de iniciar, pero el código se enreda y
+    un cambio puede romper otras partes (incumple DA06).
+- **Consecuencias:**
+  - (+) Despliegue y operación simples.
+  - (+) Se escala replicando la aplicación completa (escalamiento horizontal).
+  - (+) Los módulos permiten una futura separación en servicios si fuera necesario.
+  - (−) Si un módulo falla gravemente, puede afectar a todo el proceso.
+  - (−) Exige disciplina del equipo para respetar los límites entre módulos.
+
+### ADR-002: Clean Architecture
+
+- **Estado:** Aceptada
+- **Drivers:** DA06 Mantenibilidad
+- **Contexto:** Los cambios en la tecnología (base de datos, framework, pasarela)
+  no deben obligar a reescribir las reglas del negocio.
+- **Decisión:** Organizar el código en cuatro capas: Dominio (entidades y reglas),
+  Aplicación (casos de uso y puertos), Presentación (interfaz) e Infraestructura
+  (implementaciones concretas). Las dependencias del código apuntan siempre hacia
+  el dominio.
+- **Alternativas evaluadas:**
+  - *Arquitectura en capas tradicional (MVC):* más simple, pero tiende a acoplar la
+    lógica de negocio al framework y a la base de datos.
+  - *Arquitectura hexagonal:* es equivalente en idea, pero en el curso se trabaja
+    con Clean Architecture.
+- **Consecuencias:**
+  - (+) Las reglas de negocio se prueban sin frameworks ni base de datos.
+  - (+) Se pueden cambiar detalles técnicos sin tocar el dominio.
+  - (−) Más archivos e interfaces, lo que aumenta el trabajo inicial.
+  - (−) Curva de aprendizaje para quien no conoce el enfoque.
+
+### ADR-003: Estrategia de caché
+
+- **Estado:** Aceptada
+- **Drivers:** DA02 Rendimiento
+- **Contexto:** El catálogo y las categorías se consultan constantemente y cambian
+  poco. En campañas, la concurrencia puede saturar la base de datos.
+- **Decisión:** Almacenar en caché la información de consulta frecuente (catálogo,
+  categorías, detalle de producto) con un tiempo de expiración definido, y
+  invalidarla cuando el seller modifique un producto.
+- **Alternativas evaluadas:**
+  - *Consultar siempre la base de datos:* siempre está actualizado, pero es lento y
+    se satura bajo carga.
+  - *Réplicas de lectura de la base de datos:* mejoran la lectura, pero cuestan más
+    en infraestructura y configuración.
+- **Consecuencias:**
+  - (+) Menor tiempo de respuesta y menor carga sobre la base de datos.
+  - (−) Existe el riesgo de mostrar datos desactualizados por un breve tiempo.
+  - (−) Requiere definir una política de expiración e invalidación.
+
+### ADR-004: Integración de pagos mediante interfaces y adaptadores
+
+- **Estado:** Aceptada
+- **Drivers:** DA04 Pago externo
+- **Contexto:** El pago lo procesa una pasarela de terceros que el equipo no
+  controla, que puede fallar, cambiar de API o ser reemplazada.
+- **Decisión:** Definir en la capa de Aplicación una interfaz `ProcesadorPagos`
+  (puerto). Cada proveedor se implementa como un adaptador en Infraestructura. Los
+  casos de uso solo conocen la interfaz.
+- **Alternativas evaluadas:**
+  - *Llamar directamente al SDK de la pasarela desde los casos de uso:* es más
+    rápido de programar, pero acopla el negocio al proveedor y complica las pruebas.
+- **Consecuencias:**
+  - (+) Cambiar de pasarela solo exige un nuevo adaptador.
+  - (+) Se puede usar un adaptador simulado para pruebas y desarrollo.
+  - (−) Agrega una capa de abstracción adicional.
+  - (−) El contrato debe ser lo bastante general para servir a distintos proveedores.
+
+### ADR-005: API REST entre frontend y backend
+
+- **Estado:** Aceptada
+- **Drivers:** DA05 API REST
+- **Contexto:** El frontend web y el backend deben evolucionar por separado y
+  comunicarse mediante un estándar conocido.
+- **Decisión:** Exponer el backend como una API REST versionada (`/api/v1/*`) con
+  intercambio en JSON sobre HTTPS.
+- **Alternativas evaluadas:**
+  - *GraphQL:* permite consultas flexibles, pero agrega complejidad que no se
+    justifica para el alcance del proyecto.
+  - *Renderizado en servidor (frontend y backend juntos):* simplifica el despliegue,
+    pero impide separar y evolucionar ambas partes de forma independiente.
+- **Consecuencias:**
+  - (+) Interfaz estándar, simple y desacoplada del frontend.
+  - (+) El versionado permite evolucionar la API sin romper clientes existentes.
+  - (−) Una vista compleja puede requerir varias llamadas al backend.
+
+### ADR-006: Autenticación con JWT y roles
+
+- **Estado:** Aceptada
+- **Drivers:** DA03 Seguridad, DA01 Escalabilidad
+- **Contexto:** El sistema maneja datos personales y de pago, y distingue tres tipos
+  de usuario (cliente, seller y administrador) con permisos distintos.
+- **Decisión:** Autenticar con JSON Web Tokens (JWT) y autorizar por rol mediante un
+  middleware que valida el token antes de llegar a los módulos. La comunicación se
+  hace siempre por HTTPS.
+- **Alternativas evaluadas:**
+  - *Sesiones almacenadas en el servidor:* son sencillas, pero dificultan el
+    escalamiento horizontal porque el estado queda en una instancia concreta.
+- **Consecuencias:**
+  - (+) El servidor no guarda estado de sesión, así que se puede replicar fácilmente.
+  - (+) Los permisos por rol se aplican de forma centralizada.
+  - (−) Hay que gestionar con cuidado la expiración y la revocación de tokens.
+
+---
+
+## 5.3 Cobertura de drivers
+
+| Driver | ADR que lo responde |
+|---|---|
+| DA01 Escalabilidad | ADR-001, ADR-006 |
+| DA02 Rendimiento | ADR-003 |
+| DA03 Seguridad | ADR-006 |
+| DA04 Pago externo | ADR-004 |
+| DA05 API REST | ADR-005 |
+| DA06 Mantenibilidad | ADR-001, ADR-002 |
+
+- [x] Cada driver tiene al menos una decisión que lo responde.
+- [x] Cada decisión incluye alternativas evaluadas y consecuencias.
